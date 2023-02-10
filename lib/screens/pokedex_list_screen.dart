@@ -1,62 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_pokedex/providers/pokemon_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 import './detail.screen.dart';
 
-class PokedexList extends StatefulWidget {
+// riverpodを使いたいけどinitStateを使いたいからCousumerStatefulWidgetを使用
+class PokedexList extends ConsumerStatefulWidget {
   final String url;
   const PokedexList({super.key, required this.url});
 
   @override
-  State<PokedexList> createState() => _PokedexListState();
+  _PokedexListState createState() => _PokedexListState();
 }
 
-class _PokedexListState extends State<PokedexList> {
+class _PokedexListState extends ConsumerState<PokedexList> {
   final Dio dio = Dio();
-  // ポケモン個別のURLを入れる
-  List urls = [];
-  // ポケモン個別のデータ
-  List indivisualDatas = [];
-  // ポケモン個別のspeciesData
-  List speciesDatas = [];
-  // 前のページ
-  String? previousUrl = '';
-  // 後のページ
-  String? nextUrl = '';
-
-  bool isLoading = true;
 
   // ポケモン個別のURLをフェッチする
   Future<void> fetchUrls(String url) async {
     final Response<dynamic> response = await dio.get(url);
-    previousUrl = response.data['previous'];
-    nextUrl = response.data['next'];
-    setState(() {
-      urls.clear();
-      indivisualDatas.clear();
-      speciesDatas.clear();
-      isLoading = true;
-    });
-    for (int i = 0; i < response.data['results'].length; i++) {
-      urls.add(response.data['results'][i]['url']);
+    final newUrls = [];
+    final nextUrl = ref.watch(nextUrlProvider);
+    ref.read(previousUrlProvider.notifier).state = response.data['previous'];
+    ref.read(nextUrlProvider.notifier).state = response.data['next'];
+    if (nextUrl != null) {
+      final splitPage = ref.read(nextUrlProvider.notifier).state!.split('&');
+      final splitPage2 = splitPage[0].split('=');
+      ref.read(currentPageProvider.notifier).state =
+          (int.parse(splitPage2.last) / 20).floor() - 1;
     }
-    fetchIndividualDatas();
+
+    /* 初期する処理 */
+    ref.read(urlsProvider.notifier).state = [];
+    ref.read(individualDatasProvider.notifier).state = [];
+    ref.read(loadingProvider.notifier).state = true;
+    ref.read(speciesDatasProvider.notifier).state = [];
+    /* ---------- */
+
+    for (int i = 0; i < response.data['results'].length; i++) {
+      newUrls.add(response.data['results'][i]['url']);
+    }
+    ref.read(urlsProvider.notifier).state = [...newUrls];
+    fetchIndividualDatas(newUrls);
   }
 
   // 色々フェッチする
-  Future<void> fetchIndividualDatas() async {
-    for (int i = 0; i < urls.length; i++) {
-      final fetchIndividualFiles = await dio.get(urls[i]);
+  Future<void> fetchIndividualDatas(List<dynamic> newUrls) async {
+    final indivisualDatas = [];
+    final speciesDatas = [];
+
+    for (int i = 0; i < newUrls.length; i++) {
+      final fetchIndividualFiles = await dio.get(newUrls[i]);
       indivisualDatas.add(fetchIndividualFiles.data);
       final speciesData = await dio.get(
         fetchIndividualFiles.data['species']['url'],
       );
       speciesDatas.add(speciesData.data);
     }
-    isLoading = false;
+    ref.read(loadingProvider.notifier).state = false;
+    ref.read(individualDatasProvider.notifier).state = [...indivisualDatas];
+    ref.read(speciesDatasProvider.notifier).state = [...speciesDatas];
     setState(() {});
-    print(urls);
-    print(indivisualDatas);
   }
 
   @override
@@ -70,14 +76,39 @@ class _PokedexListState extends State<PokedexList> {
     final deviceHeight = MediaQuery.of(context).size.height;
     final deviceWidth = MediaQuery.of(context).size.width;
 
+    // 現在いるページ番号
+    int currentPage = ref.watch(currentPageProvider);
+    // loading判定
+    bool isLoading = ref.watch(loadingProvider);
+    // 前のページ
+    String? previousUrl = ref.watch(previousUrlProvider);
+    // 後のページ
+    String? nextUrl = ref.watch(nextUrlProvider);
+    // ポケモン個別のデータ
+    List indivisualDatas = ref.watch(individualDatasProvider);
+    // ポケモン個別のspeciesData
+    List speciesDatas = ref.watch(speciesDatasProvider);
+    // ポケモン個別のURLを入れる
+    List urls = ref.watch(urlsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pokedex'),
+        actions: [
+          Text(
+            currentPage.toString(),
+          ),
+        ],
       ),
-      backgroundColor: Colors.pinkAccent,
+      backgroundColor: Colors.pink[100],
       body: Center(
         child: isLoading
-            ? const CircularProgressIndicator()
+            ? LoadingAnimationWidget.discreteCircle(
+                color: Colors.white,
+                secondRingColor: Colors.green,
+                thirdRingColor: Colors.orange,
+                size: deviceWidth * 0.3,
+              )
             : SingleChildScrollView(
                 child: Column(
                   children: [
@@ -137,8 +168,9 @@ class _PokedexListState extends State<PokedexList> {
                                 DetailScreen.routeName,
                                 arguments: <String, dynamic>{
                                   // イラスト
-                                  'sprite':
-                                      'https://img.pokemondb.net/artwork/${indivisualDatas[index]['name']}.jpg',
+                                  'sprite': indivisualDatas[index]['sprites']
+                                          ['other']['official-artwork']
+                                      ['front_default'],
                                   // 名前
                                   'name': speciesDatas[index]['names'][0]
                                       ['name'],
@@ -158,14 +190,22 @@ class _PokedexListState extends State<PokedexList> {
                                     MainAxisAlignment.spaceBetween,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Image.network(
-                                    // indivisualDatas[index]['sprites']
-                                    //     ['front_default'],
-                                    'https://img.pokemondb.net/artwork/${indivisualDatas[index]['name']}.jpg',
-                                    height: deviceHeight * 0.1,
-                                    width: deviceWidth * 0.2,
-                                    // scale: 1,
-                                  ),
+                                  indivisualDatas[index]['sprites']['other']
+                                                  ['official-artwork']
+                                              ['front_default'] !=
+                                          null
+                                      ? Image.network(
+                                          indivisualDatas[index]['sprites']
+                                                  ['other']['official-artwork']
+                                              ['front_default'],
+                                          height: deviceHeight * 0.1,
+                                          width: deviceWidth * 0.2,
+                                          // scale: 1,
+                                        )
+                                      : const Text(
+                                          '404\nNotFound',
+                                          textAlign: TextAlign.center,
+                                        ),
                                   Text(
                                     speciesDatas[index]['names'][0]['name'],
                                   ),
@@ -175,6 +215,37 @@ class _PokedexListState extends State<PokedexList> {
                           ),
                         );
                       },
+                    ),
+                    FittedBox(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (int i = currentPage;
+                              i < currentPage + 10;
+                              i++) ...{
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(50, 50),
+                              ),
+                              onPressed: i == currentPage
+                                  ? null
+                                  : () {
+                                      fetchUrls(
+                                        'https://pokeapi.co/api/v2/pokemon/?offset=${(i) * 20}&limit=20',
+                                      );
+                                    },
+                              child: FittedBox(
+                                child: Text(
+                                  (i + 1).toString(),
+                                  style: const TextStyle(
+                                    fontSize: 36,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          }
+                        ],
+                      ),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -190,9 +261,11 @@ class _PokedexListState extends State<PokedexList> {
                                 child: Card(
                                   elevation: 5,
                                   child: InkWell(
-                                    onTap: () => fetchUrls(previousUrl!),
+                                    onTap: () => fetchUrls(
+                                      'https://pokeapi.co/api/v2/pokemon/?offset=0&limit=20',
+                                    ),
                                     child: const FittedBox(
-                                      child: Text('前'),
+                                      child: Text('一番初め'),
                                     ),
                                   ),
                                 ),
@@ -208,9 +281,12 @@ class _PokedexListState extends State<PokedexList> {
                                 child: Card(
                                   elevation: 5,
                                   child: InkWell(
-                                    onTap: () => fetchUrls(nextUrl!),
+                                    // onTap: () => fetchUrls(nextUrl!),
+                                    onTap: () => fetchUrls(
+                                      'https://pokeapi.co/api/v2/pokemon/?offset=1200&limit=20',
+                                    ),
                                     child: const FittedBox(
-                                      child: Text('次'),
+                                      child: Text('一番後ろ'),
                                     ),
                                   ),
                                 ),

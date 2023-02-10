@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import './screens/pokedex_list_screen.dart';
 import './screens/detail.screen.dart';
-import './screens/title_screen.dart';
 
 void main() {
   runApp(
@@ -24,7 +23,6 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: const PokedexList(url: 'https://pokeapi.co/api/v2/pokemon/'),
-      // home: const TitleScreen(),
       routes: {
         DetailScreen.routeName: (context) => const DetailScreen(),
       },
