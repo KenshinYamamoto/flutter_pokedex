@@ -21,10 +21,10 @@ class _PokedexListState extends ConsumerState<PokedexList> {
   // ポケモン個別のURLをフェッチする
   Future<void> fetchUrls(String url) async {
     final Response<dynamic> response = await dio.get(url);
-    final newUrls = [];
-    final nextUrl = ref.watch(nextUrlProvider);
     ref.read(previousUrlProvider.notifier).state = response.data['previous'];
     ref.read(nextUrlProvider.notifier).state = response.data['next'];
+    final newUrls = [];
+    final nextUrl = ref.watch(nextUrlProvider);
     if (nextUrl != null) {
       final splitPage = ref.read(nextUrlProvider.notifier).state!.split('&');
       final splitPage2 = splitPage[0].split('=');
@@ -202,12 +202,23 @@ class _PokedexListState extends ConsumerState<PokedexList> {
                                           width: deviceWidth * 0.2,
                                           // scale: 1,
                                         )
-                                      : const Text(
-                                          '404\nNotFound',
-                                          textAlign: TextAlign.center,
+                                      : Container(
+                                          height: deviceHeight * 0.1,
+                                          width: deviceWidth * 0.2,
+                                          decoration: const BoxDecoration(
+                                            image: DecorationImage(
+                                              image: AssetImage(
+                                                'assets/images/not_found.png',
+                                              ),
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
                                         ),
                                   Text(
                                     speciesDatas[index]['names'][0]['name'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -223,75 +234,148 @@ class _PokedexListState extends ConsumerState<PokedexList> {
                           for (int i = currentPage;
                               i < currentPage + 10;
                               i++) ...{
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(50, 50),
-                              ),
-                              onPressed: i == currentPage
-                                  ? null
-                                  : () {
-                                      fetchUrls(
-                                        'https://pokeapi.co/api/v2/pokemon/?offset=${(i) * 20}&limit=20',
-                                      );
-                                    },
-                              child: FittedBox(
-                                child: Text(
-                                  (i + 1).toString(),
-                                  style: const TextStyle(
-                                    fontSize: 36,
+                            if (i < 64)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(50, 50),
+                                ),
+                                onPressed: i == currentPage
+                                    ? null
+                                    : () {
+                                        fetchUrls(
+                                          'https://pokeapi.co/api/v2/pokemon/?offset=${(i) * 20}&limit=20',
+                                        );
+                                      },
+                                child: FittedBox(
+                                  child: Text(
+                                    (i + 1).toString(),
+                                    style: const TextStyle(
+                                      fontSize: 36,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           }
                         ],
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        previousUrl == null
-                            ? SizedBox(
-                                height: deviceHeight * 0.1,
-                                width: deviceWidth * 0.45,
-                              )
-                            : SizedBox(
-                                height: deviceHeight * 0.1,
-                                width: deviceWidth * 0.45,
-                                child: Card(
-                                  elevation: 5,
-                                  child: InkWell(
-                                    onTap: () => fetchUrls(
-                                      'https://pokeapi.co/api/v2/pokemon/?offset=0&limit=20',
+                    FittedBox(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          previousUrl == null
+                              ? SizedBox(
+                                  height: deviceHeight * 0.1,
+                                  width: deviceWidth * 0.45,
+                                )
+                              : Row(
+                                  children: [
+                                    SizedBox(
+                                      height: deviceHeight * 0.1,
+                                      width: deviceWidth * 0.45,
+                                      child: Card(
+                                        elevation: 5,
+                                        child: InkWell(
+                                          onTap: () => fetchUrls(
+                                            'https://pokeapi.co/api/v2/pokemon/?offset=0&limit=20',
+                                          ),
+                                          child: FittedBox(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(3),
+                                              child: Row(
+                                                children: const [
+                                                  Icon(
+                                                    Icons.arrow_back,
+                                                  ),
+                                                  Text('先頭へ'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    child: const FittedBox(
-                                      child: Text('一番初め'),
+                                    SizedBox(
+                                      height: deviceHeight * 0.1,
+                                      width: deviceWidth * 0.45,
+                                      child: Card(
+                                        elevation: 5,
+                                        child: InkWell(
+                                          onTap: () => fetchUrls(previousUrl),
+                                          child: FittedBox(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(3),
+                                              child: Row(
+                                                children: const [
+                                                  Icon(
+                                                    Icons.arrow_back,
+                                                  ),
+                                                  Text('前へ'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                        nextUrl == null
-                            ? SizedBox(
-                                height: deviceHeight * 0.1,
-                                width: deviceWidth * 0.45,
-                              )
-                            : SizedBox(
-                                height: deviceHeight * 0.1,
-                                width: deviceWidth * 0.45,
-                                child: Card(
-                                  elevation: 5,
-                                  child: InkWell(
-                                    // onTap: () => fetchUrls(nextUrl!),
-                                    onTap: () => fetchUrls(
-                                      'https://pokeapi.co/api/v2/pokemon/?offset=1200&limit=20',
+                          nextUrl == null
+                              ? SizedBox(
+                                  height: deviceHeight * 0.1,
+                                  width: deviceWidth * 0.45,
+                                )
+                              : Row(
+                                  children: [
+                                    SizedBox(
+                                      height: deviceHeight * 0.1,
+                                      width: deviceWidth * 0.45,
+                                      child: Card(
+                                        elevation: 5,
+                                        child: InkWell(
+                                          onTap: () => fetchUrls(nextUrl),
+                                          child: FittedBox(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(3),
+                                              child: Row(
+                                                children: const [
+                                                  Text('次へ'),
+                                                  Icon(Icons.arrow_forward)
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    child: const FittedBox(
-                                      child: Text('一番後ろ'),
+                                    SizedBox(
+                                      height: deviceHeight * 0.1,
+                                      width: deviceWidth * 0.45,
+                                      child: Card(
+                                        elevation: 5,
+                                        child: InkWell(
+                                          // onTap: () => fetchUrls(nextUrl!),
+                                          onTap: () => fetchUrls(
+                                            'https://pokeapi.co/api/v2/pokemon/?offset=1260&limit=20',
+                                          ),
+                                          child: FittedBox(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(3),
+                                              child: Row(
+                                                children: const [
+                                                  Text('最後へ'),
+                                                  Icon(Icons.arrow_forward)
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                      ],
+                        ],
+                      ),
                     )
                   ],
                 ),
